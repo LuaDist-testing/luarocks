@@ -93,7 +93,10 @@ function list.run(...)
    
    local results = {}
    for _, tree in ipairs(trees) do
-      search.manifest_search(results, path.rocks_dir(tree), query)
+      local ok, err = search.manifest_search(results, path.rocks_dir(tree), query)
+      if not ok then
+         util.warning(err)
+      end
    end
    util.title("Installed rocks:", flags["porcelain"])
    search.print_results(results, flags["porcelain"])

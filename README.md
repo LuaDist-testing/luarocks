@@ -1,9 +1,10 @@
-LuaRocks
-========
+<p align="center"><a href="http://luarocks.org"><img border="0" src="http://keplerproject.github.io/luarocks/luarocks.png" alt="LuaRocks" width="500px"></a></p>
 
 A package manager for Lua modules.
 
 [![Build Status](https://travis-ci.org/keplerproject/luarocks.png?branch=master)](https://travis-ci.org/keplerproject/luarocks)
+[![Build status](https://ci.appveyor.com/api/projects/status/4x4630tcf64da48i/branch/master?svg=true)](https://ci.appveyor.com/project/hishamhm/luarocks/branch/master)
+[![Coverage Status](https://coveralls.io/repos/keplerproject/luarocks/badge.svg?branch=master)](https://coveralls.io/r/keplerproject/luarocks?branch=master)
 
 Main website: [luarocks.org](http://www.luarocks.org)
 

@@ -34,7 +34,7 @@ end
 
 cfg.site_config = site_config
 
-cfg.program_version = "2.2.1"
+cfg.program_version = "2.2.2"
 cfg.program_series = "2.2"
 cfg.major_version = (cfg.program_version:match("([^.]%.[^.])")) or cfg.program_series
 
@@ -139,7 +139,7 @@ else
    cfg.home = os.getenv("HOME") or ""
    sys_config_dir = sys_config_dir or "/etc/luarocks"
    home_config_dir = cfg.home.."/.luarocks"
-   cfg.home_tree = cfg.home.."/.luarocks/"
+   cfg.home_tree = (os.getenv("USER") ~= "root") and cfg.home.."/.luarocks/"
 end
 
 cfg.variables = {}
@@ -149,26 +149,34 @@ sys_config_file = site_config.LUAROCKS_SYSCONFIG or sys_config_dir.."/config-"..
 local err, errcode
 sys_config_ok, err, errcode = persist.load_into_table(sys_config_file, cfg)
 
-if (not sys_config_ok) and errcode ~= "run" then
+if (not sys_config_ok) and errcode == "open" then -- file not found, so try alternate file
    sys_config_file = sys_config_dir.."/config.lua"
    sys_config_ok, err, errcode = persist.load_into_table(sys_config_file, cfg)
 end
-if (not sys_config_ok) and errcode ~= "open" then
+if (not sys_config_ok) and errcode ~= "open" then -- either "load" or "run"; bad config file, bail out with error
    io.stderr:write(err.."\n")
    os.exit(cfg.errorcodes.CONFIGFILE)
 end
 
+local env_for_config_file = {
+   home = cfg.home,
+   lua_version = cfg.lua_version,
+   platform = util.make_shallow_copy(detected),
+   processor = proc,
+}
+
 if not site_config.LUAROCKS_FORCE_CONFIG then
+
    local home_overrides, err, errcode
    home_config_file = os.getenv("LUAROCKS_CONFIG_" .. version_suffix) or os.getenv("LUAROCKS_CONFIG")
    if home_config_file then
-      home_overrides, err, errcode = persist.load_into_table(home_config_file, { home = cfg.home, lua_version = cfg.lua_version })
+      home_overrides, err, errcode = persist.load_into_table(home_config_file, env_for_config_file)
    else
       home_config_file = home_config_dir.."/config-"..cfg.lua_version..".lua"
-      home_overrides, err, errcode = persist.load_into_table(home_config_file, { home = cfg.home, lua_version = cfg.lua_version })
+      home_overrides, err, errcode = persist.load_into_table(home_config_file, env_for_config_file)
       if (not home_overrides) and (not errcode == "run") then
          home_config_file = home_config_dir.."/config.lua"
-         home_overrides, err, errcode = persist.load_into_table(home_config_file, { home = cfg.home, lua_version = cfg.lua_version })
+         home_overrides, err, errcode = persist.load_into_table(home_config_file, env_for_config_file)
       end
    end
    if home_overrides then
@@ -220,16 +228,16 @@ local defaults = {
 
    rocks_servers = {
       {
-        "https://rocks.moonscript.org",
+        "https://luarocks.org",
         "https://raw.githubusercontent.com/rocks-moonscript-org/moonrocks-mirror/master/",
         "http://luafr.org/moonrocks/",
         "http://luarocks.logiceditor.com/rocks",
       }
    },
    disabled_servers = {},
-   
+
    upload = {
-      server = "https://rocks.moonscript.org",
+      server = "https://luarocks.org",
       tool_version = "1.0.0",
       api_version = "1",
    },
@@ -315,7 +323,7 @@ if detected.windows then
    defaults.variables.LUA_BINDIR = site_config.LUA_BINDIR and site_config.LUA_BINDIR:gsub("\\", "/") or "c:/lua"..cfg.lua_version.."/bin"
    defaults.variables.LUA_INCDIR = site_config.LUA_INCDIR and site_config.LUA_INCDIR:gsub("\\", "/") or "c:/lua"..cfg.lua_version.."/include"
    defaults.variables.LUA_LIBDIR = site_config.LUA_LIBDIR and site_config.LUA_LIBDIR:gsub("\\", "/") or "c:/lua"..cfg.lua_version.."/lib"
-   defaults.cmake_generator = "MinGW Makefiles"
+
    defaults.makefile = "Makefile.win"
    defaults.variables.MAKE = "nmake"
    defaults.variables.CC = "cl"
@@ -324,8 +332,8 @@ if detected.windows then
    defaults.variables.LD = "link"
    defaults.variables.MT = "mt"
    defaults.variables.LUALIB = "lua"..cfg.lua_version..".lib"
-   defaults.variables.CFLAGS = "/MD /O2"
-   defaults.variables.LIBFLAG = "/dll"
+   defaults.variables.CFLAGS = "/nologo /MD /O2"
+   defaults.variables.LIBFLAG = "/nologo /dll"
 
    local bins = { "SEVENZ", "CP", "FIND", "LS", "MD5SUM",
       "MKDIR", "MV", "PWD", "RMDIR", "TEST", "UNAME", "WGET" }
@@ -450,7 +458,7 @@ if detected.macosx then
    if version >= 10 then
       version = 8
    elseif version >= 5 then
-	  version = 5
+      version = 5
    else
       defaults.gcc_rpath = false
    end
@@ -569,7 +577,7 @@ function cfg.package_paths()
       table.insert(new_cpath, lib_path.."/?."..cfg.lib_extension)
       table.insert(new_bin, bin_path)
    end
-   if extra_luarocks_module_dir then 
+   if extra_luarocks_module_dir then
      table.insert(new_path, extra_luarocks_module_dir)
    end
    return table.concat(new_path, ";"), table.concat(new_cpath, ";"), table.concat(new_bin, cfg.export_path_separator)
