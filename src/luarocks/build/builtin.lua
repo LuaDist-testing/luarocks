@@ -164,7 +164,7 @@ function builtin.run(rockspec)
             add_flags(extras, "-Wl,-rpath,%s:", libdirs)
          end
          add_flags(extras, "-l%s", libraries)
-         if cfg.is_platform("cygwin") then
+         if cfg.link_lua_explicitly then
             add_flags(extras, "-l%s", {"lua"})
          end
          return execute(variables.LD.." "..variables.LIBFLAG, "-o", library, "-L"..variables.LUA_LIBDIR, unpack(extras))
@@ -205,14 +205,11 @@ function builtin.run(rockspec)
          local ext = info:match("%.([^.]+)$")
          if ext == "lua" then
             local filename = dir.base_name(info)
-            if info:match("init%.lua$") and not name:match("%.init$") then
+            if filename == "init.lua" and not name:match("%.init$") then
                moddir = path.module_to_path(name..".init")
             else
                local basename = name:match("([^.]+)$")
-               local baseinfo = filename:gsub("%.lua$", "")
-               if basename ~= baseinfo then
-                  filename = basename..".lua"
-               end
+               filename = basename..".lua"
             end
             local dest = dir.path(luadir, moddir, filename)
             lua_modules[info] = dest

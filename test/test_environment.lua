@@ -202,6 +202,9 @@ function test_env.set_args()
 
       if execute_bool("sw_vers") then 
          test_env.TEST_TARGET_OS = "osx"
+         if test_env.TRAVIS then
+            test_env.OPENSSL_DIRS = "OPENSSL_LIBDIR=/usr/local/opt/openssl/lib OPENSSL_INCDIR=/usr/local/opt/openssl/include"
+         end
       elseif execute_output("uname -s") == "Linux" then
          test_env.TEST_TARGET_OS = "linux"
       else
@@ -211,7 +214,7 @@ function test_env.set_args()
    return true
 end
 
-local function copy_dir(source_path, target_path)
+function test_env.copy_dir(source_path, target_path)
    local testing_paths = test_env.testing_paths
    if test_env.TEST_TARGET_OS == "windows" then
       execute_bool(testing_paths.win_tools .. "/cp -R ".. source_path .. "/. " .. target_path)
@@ -427,8 +430,8 @@ local function build_environment(rocks, env_variables)
       end
    end
    
-   copy_dir(testing_paths.testing_tree, testing_paths.testing_tree_copy)
-   copy_dir(testing_paths.testing_sys_tree, testing_paths.testing_sys_tree_copy)
+   test_env.copy_dir(testing_paths.testing_tree, testing_paths.testing_tree_copy)
+   test_env.copy_dir(testing_paths.testing_sys_tree, testing_paths.testing_sys_tree_copy)
 end
 
 --- Reset testing environment
@@ -438,12 +441,12 @@ local function reset_environment(testing_paths, md5sums)
 
    if testing_tree_md5 ~= md5sums.testing_tree_copy_md5 then
       test_env.remove_dir(testing_paths.testing_tree)
-      copy_dir(testing_paths.testing_tree_copy, testing_paths.testing_tree)
+      test_env.copy_dir(testing_paths.testing_tree_copy, testing_paths.testing_tree)
    end
 
    if testing_sys_tree_md5 ~= md5sums.testing_sys_tree_copy_md5 then
       test_env.remove_dir(testing_paths.testing_sys_tree)
-      copy_dir(testing_paths.testing_sys_tree_copy, testing_paths.testing_sys_tree)
+      test_env.copy_dir(testing_paths.testing_sys_tree_copy, testing_paths.testing_sys_tree)
    end
    print("\n[ENVIRONMENT RESET]")
 end
@@ -511,6 +514,8 @@ function test_env.setup_specs(extra_rocks)
       package.path = test_env.env_variables.LUA_PATH
 
       test_env.platform = execute_output(test_env.testing_paths.lua .. " -e \"print(require('luarocks.cfg').arch)\"", false, test_env.env_variables)
+      test_env.lib_extension = execute_output(test_env.testing_paths.lua .. " -e \"print(require('luarocks.cfg').lib_extension)\"", false, test_env.env_variables)
+      test_env.wrapper_extension = test_env.TEST_TARGET_OS == "windows" and ".bat" or ""
       test_env.md5sums = create_md5sums(test_env.testing_paths)
       test_env.setup_done = true
       title("RUNNING TESTS")

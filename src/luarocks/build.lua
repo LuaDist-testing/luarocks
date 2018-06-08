@@ -72,10 +72,7 @@ local function install_files(files, location, is_module_path, perms)
                if not ok then return nil, err end
                if filename:match("%.lua$") then
                   local basename = modname:match("([^.]+)$")
-                  local baseinfo = filename:gsub("%.lua$", "")
-                  if basename ~= baseinfo then
-                     filename = basename..".lua"
-                  end
+                  filename = basename..".lua"
                end
             else
                dest = dir.path(location, dir.dir_name(modname))
@@ -202,11 +199,11 @@ function build.build_rockspec(rockspec_file, need_to_fetch, minimal_mode, deps_m
    end   
 
    if repos.is_installed(name, version) then
-      repos.delete_version(name, version)
+      repos.delete_version(name, version, deps_mode)
    end
 
    if not minimal_mode then
-      local _, source_dir
+      local source_dir
       if need_to_fetch then
          ok, source_dir, errcode = fetch.fetch_sources(rockspec, true)
          if not ok then
@@ -320,18 +317,15 @@ function build.build_rockspec(rockspec_file, need_to_fetch, minimal_mode, deps_m
    ok, err = manif.make_rock_manifest(name, version)
    if err then return nil, err end
 
-   ok, err = repos.deploy_files(name, version, repos.should_wrap_bin_scripts(rockspec))
+   ok, err = repos.deploy_files(name, version, repos.should_wrap_bin_scripts(rockspec), deps_mode)
    if err then return nil, err end
    
    util.remove_scheduled_function(rollback)
    rollback = util.schedule_function(function()
-      repos.delete_version(name, version)
+      repos.delete_version(name, version, deps_mode)
    end)
 
    ok, err = repos.run_hook(rockspec, "post_install")
-   if err then return nil, err end
-
-   ok, err = manif.update_manifest(name, version, nil, deps_mode)
    if err then return nil, err end
 
    util.announce_install(rockspec)
@@ -406,14 +400,14 @@ function build.command(flags, name, version)
       if not ok then return nil, err, cfg.errorcodes.PERMISSIONDENIED end
       ok, err = do_build(name, version, deps.get_deps_mode(flags), flags["only-deps"])
       if not ok then return nil, err end
-      local name, version = ok, err
-      if flags["only-deps"] then
-         return name, version
-      end
-      if (not flags["keep"]) and not cfg.keep_other_versions then
+      name, version = ok, err
+
+      if (not flags["only-deps"]) and (not flags["keep"]) and not cfg.keep_other_versions then
          local ok, err = remove.remove_other_versions(name, version, flags["force"], flags["force-fast"])
          if not ok then util.printerr(err) end
       end
+
+      manif.check_dependencies(nil, deps.get_deps_mode(flags))
       return name, version
    end
 end

@@ -18,7 +18,13 @@ local extra_rocks = {
    "/lxsh-0.8.6-2.rockspec",
    "/say-1.2-1.src.rock",
    "/say-1.0-1.src.rock",
-   "/wsapi-1.6-1.src.rock"
+   "/wsapi-1.6-1.src.rock",
+   "/luafilesystem-1.6.3-2.src.rock",
+   "/luafilesystem-1.6.3-1.src.rock",
+   "/luacheck-0.7.3-1.src.rock",
+   "/luacheck-0.8.0-1.src.rock",
+   "/sailor-0.5-3.src.rock",
+   "/sailor-0.5-4.src.rock",
 }
 
 describe("LuaRocks install tests #blackbox #b_install", function()
@@ -80,6 +86,62 @@ describe("LuaRocks install tests #blackbox #b_install", function()
             assert.is.falsy(lfs.attributes(testing_paths.testing_sys_tree .. "/lib/luarocks/rocks/luasocket"))
          end
          assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/lib/luarocks/rocks/luasec"))
+      end)
+
+      it('LuaRocks install - handle relative path in --tree #632', function()
+         local relative_path = "./temp_dir_"..math.random(100000)
+         if test_env.TEST_TARGET_OS == "windows" then
+            relative_path = relative_path:gsub("/", "\\")
+         end
+         test_env.remove_dir(relative_path)
+         assert.is.falsy(lfs.attributes(relative_path))
+         assert.is_true(run.luarocks_bool("install luafilesystem --tree="..relative_path))
+         assert.is.truthy(lfs.attributes(relative_path))
+         test_env.remove_dir(relative_path)
+         assert.is.falsy(lfs.attributes(relative_path))
+      end)
+
+      it('LuaRocks install - handle versioned modules when installing another version with --keep #268', function()
+         assert.is_true(run.luarocks_bool("install luafilesystem"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/lib/lua/"..env_variables.LUA_VERSION.."/lfs."..test_env.lib_extension))
+
+         assert.is_true(run.luarocks_bool("install luafilesystem 1.6.3-1 --keep"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/lib/lua/"..env_variables.LUA_VERSION.."/lfs."..test_env.lib_extension))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/lib/lua/"..env_variables.LUA_VERSION.."/luafilesystem_1_6_3_1-lfs."..test_env.lib_extension))
+
+         assert.is_true(run.luarocks_bool("install luafilesystem"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/lib/lua/"..env_variables.LUA_VERSION.."/lfs."..test_env.lib_extension))
+         assert.is.falsy(lfs.attributes(testing_paths.testing_sys_tree .. "/lib/lua/"..env_variables.LUA_VERSION.."/luafilesystem_1_6_3_1-lfs."..test_env.lib_extension))
+      end)
+
+      it('LuaRocks install - handle versioned modules and commands from different files when upgrading #302', function()
+         io.open(testing_paths.testing_sys_tree .. "/bin/luacheck"..test_env.wrapper_extension, "w"):close()
+         assert.is_true(run.luarocks_bool("install luacheck 0.7.3 --deps-mode=none"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/luacheck.lua"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/bin/luacheck"..test_env.wrapper_extension))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/bin/luacheck"..test_env.wrapper_extension .. "~"))
+
+         assert.is_true(run.luarocks_bool("install luacheck 0.8.0 --deps-mode=none"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/luacheck/init.lua"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/bin/luacheck"..test_env.wrapper_extension))
+         assert.is.falsy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/luacheck_0_7_3_1-luacheck.lua"))
+         assert.is.falsy(lfs.attributes(testing_paths.testing_sys_tree .. "/bin/luacheck_0_7_3_1-luacheck"..test_env.wrapper_extension))
+
+         assert.is_true(run.luarocks_bool("install luacheck 0.7.3 --keep --deps-mode=none"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/luacheck/init.lua"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/bin/luacheck"..test_env.wrapper_extension))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/luacheck_0_7_3_1-luacheck.lua"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/bin/luacheck_0_7_3_1-luacheck"..test_env.wrapper_extension))
+      end)
+
+      it('LuaRocks install - handle non-Lua files in build.install.lua when upgrading sailorproject/sailor#138', function()
+         assert.is_true(run.luarocks_bool("install sailor 0.5-3 --deps-mode=none"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/sailor/blank-app/.htaccess"))
+         assert.is.falsy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/sailor/blank-app/.htaccess~"))
+
+         assert.is_true(run.luarocks_bool("install sailor 0.5-4 --deps-mode=none"))
+         assert.is.truthy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/sailor/blank-app/.htaccess"))
+         assert.is.falsy(lfs.attributes(testing_paths.testing_sys_tree .. "/share/lua/"..env_variables.LUA_VERSION.."/sailor/blank-app/.htaccess~"))
       end)
       
       it("LuaRocks install only-deps of luasocket packed rock", function()
