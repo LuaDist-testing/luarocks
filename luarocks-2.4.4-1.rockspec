@@ -1,16 +1,16 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "luarocks"
-version = "2.4.3-1"
+version = "2.4.4-1"
 -- LuaDist source
 source = {
-  tag = "2.4.3-1",
+  tag = "2.4.4-1",
   url = "git://github.com/LuaDist-testing/luarocks.git"
 }
 -- Original source
 -- source = {
---    url = "git://github.com/keplerproject/luarocks",
---    tag = "v2.4.3"
+--    url = "git://github.com/luarocks/luarocks",
+--    tag = "v2.4.4"
 -- }
 description = {
    summary = "The package manager for Lua.",
