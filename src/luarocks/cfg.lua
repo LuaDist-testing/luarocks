@@ -30,10 +30,25 @@ end
 
 _M.site_config = site_config
 
-program_version = "2.1.1"
+program_version = "2.1.2"
 major_version = program_version:match("([^.]%.[^.])")
 
 local persist = require("luarocks.persist")
+
+_M.errorcodes = setmetatable({
+   OK = 0,
+   UNSPECIFIED = 1,
+   PERMISSIONDENIED = 2,
+},{
+   __index = function(t, key)
+      local val = rawget(t, key)
+      if not val then
+         error("'"..tostring(key).."' is not a valid errorcode", 2)
+      end
+      return val
+   end
+})
+
 
 local popen_ok, popen_result = pcall(io.popen, "")
 if popen_ok then
@@ -43,7 +58,7 @@ if popen_ok then
 else
    io.stderr:write("Your version of Lua does not support io.popen,\n")
    io.stderr:write("which is required by LuaRocks. Please check your Lua installation.\n")
-   os.exit(1)
+   os.exit(_M.errorcodes.UNSPECIFIED)
 end
 
 -- System detection:
@@ -168,10 +183,10 @@ end
 
 if not next(rocks_trees) then
    if home_tree then
-      table.insert(rocks_trees, home_tree)
+      table.insert(rocks_trees, { name = "user", root = home_tree } )
    end
    if site_config.LUAROCKS_ROCKS_TREE then
-      table.insert(rocks_trees, site_config.LUAROCKS_ROCKS_TREE)
+      table.insert(rocks_trees, { name = "system", root = site_config.LUAROCKS_ROCKS_TREE } )
    end
 end
 
@@ -265,6 +280,8 @@ local defaults = {
       lib = "lib",
       include = "include"
    },
+
+   rocks_provided = {}
 }
 
 if detected.windows then
@@ -322,9 +339,10 @@ if detected.windows then
    local localappdata = os.getenv("LOCALAPPDATA")
    if not localappdata then
       -- for Windows versions below Vista
-      localappdata = os.getenv("USER_PROFILE").."/Local Settings/Application Data"
+      localappdata = os.getenv("USERPROFILE").."/Local Settings/Application Data"
    end
    defaults.local_cache = localappdata.."/LuaRocks/Cache"
+   defaults.web_browser = "start"
 end
 
 if detected.mingw32 then
@@ -386,6 +404,7 @@ if detected.unix then
    if not defaults.variables.CFLAGS:match("-fPIC") then
       defaults.variables.CFLAGS = defaults.variables.CFLAGS.." -fPIC"
    end
+   defaults.web_browser = "xdg-open"
 end
 
 if detected.cygwin then
@@ -419,6 +438,7 @@ if detected.macosx then
    end
    defaults.variables.CC = "export MACOSX_DEPLOYMENT_TARGET=10."..version.."; gcc"
    defaults.variables.LD = "export MACOSX_DEPLOYMENT_TARGET=10."..version.."; gcc"
+   defaults.web_browser = "open"
 end
 
 if detected.linux then
@@ -453,16 +473,33 @@ defaults.variables.OBJ_EXTENSION = defaults.obj_extension
 defaults.variables.LUAROCKS_PREFIX = site_config.LUAROCKS_PREFIX
 defaults.variables.LUA = site_config.LUA_DIR_SET and (defaults.variables.LUA_BINDIR.."/"..defaults.lua_interpreter) or defaults.lua_interpreter
 
+-- Add built-in modules to rocks_provided
+defaults.rocks_provided["lua"] = lua_version.."-1"
+
+if lua_version >= "5.2" then
+   -- Lua 5.2+
+   defaults.rocks_provided["bit32"] = lua_version.."-1"
+end
+
+if package.loaded.jit then
+   -- LuaJIT
+   local lj_version = package.loaded.jit.version:match("LuaJIT (.*)"):gsub("%-","")
+   --defaults.rocks_provided["luajit"] = lj_version.."-1"
+   defaults.rocks_provided["luabitop"] = lj_version.."-1"
+end
+
 -- Use defaults:
 
--- Populate values from 'defaults.variables' in 'variables' if they were not
--- already set by user.
-if not _M.variables then
-   _M.variables = {}
-end
-for k,v in pairs(defaults.variables) do
-   if not _M.variables[k] then
-      _M.variables[k] = v
+-- Populate some arrays with values from their 'defaults' counterparts
+-- if they were not already set by user.
+for _, entry in ipairs({"variables", "rocks_provided"}) do
+   if not _M[entry] then
+      _M[entry] = {}
+   end
+   for k,v in pairs(defaults[entry]) do
+      if not _M[entry][k] then
+         _M[entry][k] = v
+      end
    end
 end
 
@@ -491,12 +528,6 @@ function package_paths()
      end
    end
    return table.concat(new_path, ";"), table.concat(new_cpath, ";")
-end
-
-do
-   local new_path, new_cpath = package_paths()
-   package.path = new_path..";"..package.path
-   package.cpath = new_cpath..";"..package.cpath
 end
 
 function which_config()

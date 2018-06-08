@@ -1,4 +1,3 @@
-
 --- Type-checking functions.
 -- Functions and definitions for doing a basic lint check on files
 -- loaded by LuaRocks.
@@ -183,8 +182,10 @@ local function type_check_item(name, item, expected, context)
          return nil, "Type mismatch on field "..context..name..": expected a string"
       end
       if expected ~= "string" then
-         if not item:match("^"..expected.."$") then
-            return nil, "Type mismatch on field "..context..name..": invalid value "..item
+         if item_type ~= "string" then
+            return nil, "Type mismatch on field "..context..name..": expected a string, got a "..type(item)
+         elseif not item:match("^"..expected.."$") then
+            return nil, "Type mismatch on field "..context..name..": invalid value "..item.." does not match '"..expected.."'"
          end
       end
    elseif expected_type == "table" then

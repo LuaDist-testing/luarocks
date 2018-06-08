@@ -1,17 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "luarocks"
-version = "2.1.1-1"
+version = "2.1.2-1"
 -- LuaDist source
 source = {
-  tag = "2.1.1-1",
+  tag = "2.1.2-1",
   url = "git://github.com/LuaDist-testing/luarocks.git"
 }
 -- Original source
 -- source = {
---    url = "http://luarocks.org/releases/luarocks-2.1.1.tar.gz",
---    md5 = "911da64d6426340674ba478b40b26b4e",
---    dir = "luarocks-2.1.1"
+--    url = "http://luarocks.org/releases/luarocks-2.1.2.tar.gz",
+--    md5 = "0afc5fd6ee6ec6128fccda1bc559f41e",
+--    dir = "luarocks-2.1.2"
 -- }
 description = {
    summary = "A deployment and management system for Lua modules.",
@@ -29,7 +29,7 @@ description = {
    maintainer = "Hisham Muhammad"
 }
 dependencies = {
-   "lua >= 5.1",
+   "lua >= 5.1"
 }
 build = {
    type = "builtin",
@@ -46,6 +46,7 @@ build = {
       ['luarocks.command_line'] = "src/luarocks/command_line.lua",
       ['luarocks.deps'] = "src/luarocks/deps.lua",
       ['luarocks.dir'] = "src/luarocks/dir.lua",
+      ['luarocks.doc'] = "src/luarocks/doc.lua",
       ['luarocks.download'] = "src/luarocks/download.lua",
       ['luarocks.fetch'] = "src/luarocks/fetch.lua",
       ['luarocks.fetch.cvs'] = "src/luarocks/fetch/cvs.lua",
@@ -92,8 +93,8 @@ build = {
    },
    install = {
       bin = {
-         ['luarocks'] = "src/bin/luarocks",
-         ['luarocks-admin'] = "src/bin/luarocks-admin",
+         luarocks = "src/bin/luarocks",
+         ['luarocks-admin'] = "src/bin/luarocks-admin"
       }
    }
 }
