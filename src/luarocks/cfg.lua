@@ -5,10 +5,9 @@
 -- file format documentation</a> for details.
 --
 -- End-users shouldn't edit this file. They can override any defaults
--- set in this file using their system-wide $LUAROCKS_SYSCONFIG file
--- (see luarocks.site_config) or their user-specific configuration file
--- (~/.luarocks/config.lua on Unix or %APPDATA%/luarocks/config.lua on
--- Windows).
+-- set in this file using their system-wide or user-specific configuration
+-- files. Run `luarocks` with no arguments to see the locations of
+-- these files in your platform.
 
 local rawset, next, table, pairs, require, io, os, setmetatable, pcall, ipairs, package, tonumber, type, assert, _VERSION =
       rawset, next, table, pairs, require, io, os, setmetatable, pcall, ipairs, package, tonumber, type, assert, _VERSION
@@ -32,8 +31,8 @@ if not ok then
    site_config = {}
 end
 
-cfg.program_version = "2.3.0"
-cfg.program_series = "2.3"
+cfg.program_version = "2.4.0"
+cfg.program_series = "2.4"
 cfg.major_version = (cfg.program_version:match("([^.]%.[^.])")) or cfg.program_series
 cfg.variables = {}
 cfg.rocks_trees = {}
@@ -113,6 +112,10 @@ elseif system == "SunOS" then
 elseif system and system:match("^CYGWIN") then
    cfg.platforms.unix = true
    cfg.platforms.cygwin = true
+elseif system and system:match("^MSYS") then
+   cfg.platforms.unix = true
+   cfg.platforms.msys = true
+   cfg.platforms.cygwin = true
 elseif system and system:match("^Windows") then
    cfg.platforms.windows = true
    cfg.platforms.win32 = true
@@ -120,6 +123,9 @@ elseif system and system:match("^MINGW") then
    cfg.platforms.windows = true
    cfg.platforms.mingw32 = true
    cfg.platforms.win32 = true
+elseif system == "Haiku" then
+   cfg.platforms.unix = true
+   cfg.platforms.haiku = true
 else
    cfg.platforms.unix = true
    -- Fall back to Unix in unknown systems.
@@ -137,11 +143,12 @@ local platform_order = {
    linux = 7,
    macosx = 8,
    cygwin = 9,
+   msys = 10,
+   haiku = 11,
    -- Windows
-   win32 = 10,
-   mingw32 = 11,
-   windows = 12 }
-
+   win32 = 12,
+   mingw32 = 13,
+   windows = 14 }
 
 -- Path configuration:
 local sys_config_file, home_config_file
@@ -298,6 +305,8 @@ local defaults = {
    hooks_enabled = true,
    deps_mode = "one",
    check_certificates = false,
+   perm_read = "0644",
+   perm_exec = "0755",
 
    lua_modules_path = "/share/lua/"..cfg.lua_version,
    lib_modules_path = "/lib/lua/"..cfg.lua_version,
@@ -354,6 +363,7 @@ local defaults = {
       FIND = "find",
       TEST = "test",
       CHMOD = "chmod",
+      MKTEMP = "mktemp",
 
       ZIP = "zip",
       UNZIP = "unzip -n",
@@ -392,7 +402,7 @@ local defaults = {
 
 if cfg.platforms.windows then
    local full_prefix = (site_config.LUAROCKS_PREFIX or (os.getenv("PROGRAMFILES")..[[\LuaRocks]]))
-   extra_luarocks_module_dir = full_prefix.."\\lua\\?.lua"
+   extra_luarocks_module_dir = full_prefix.."/lua/?.lua"
 
    home_config_file = home_config_file and home_config_file:gsub("\\","/")
    defaults.fs_use_modules = false
@@ -458,6 +468,7 @@ if cfg.platforms.mingw32 then
    defaults.variables.LD = "mingw32-gcc"
    defaults.variables.CFLAGS = "-O2"
    defaults.variables.LIBFLAG = "-shared"
+   defaults.makefile = "Makefile"
    defaults.external_deps_patterns = {
       bin = { "?.exe", "?.bat" },
       -- mingw lookup list from http://stackoverflow.com/a/15853231/1793220
@@ -517,6 +528,23 @@ if cfg.platforms.cygwin then
    defaults.variables.LD = "echo -llua | xargs gcc"
    defaults.variables.LIBFLAG = "-shared"
 end
+
+if cfg.platforms.msys then
+   -- msys is basically cygwin made out of mingw, meaning the subsytem is unixish
+   -- enough, yet we can freely mix with native win32
+   defaults.external_deps_patterns = {
+      bin = { "?.exe", "?.bat", "?" },
+      lib = { "lib?.so", "lib?.so.*", "lib?.dll.a", "?.dll.a",
+              "lib?.a", "lib?.dll", "?.dll", "?.lib" },
+      include = { "?.h" }
+   }
+   defaults.runtime_external_deps_patterns = {
+      bin = { "?.exe", "?.bat" },
+      lib = { "lib?.so", "?.dll", "lib?.dll" },
+      include = { "?.h" }
+   }
+end
+
 
 if cfg.platforms.bsd then
    defaults.variables.MAKE = "gmake"
@@ -578,13 +606,11 @@ defaults.variables.LUA = site_config.LUA_DIR_SET and (defaults.variables.LUA_BIN
 -- Add built-in modules to rocks_provided
 defaults.rocks_provided["lua"] = cfg.lua_version.."-1"
 
-if cfg.lua_version >= "5.2" then
-   -- Lua 5.2+
+if bit32 then -- Lua 5.2+
    defaults.rocks_provided["bit32"] = cfg.lua_version.."-1"
 end
 
-if cfg.lua_version >= "5.3" then
-   -- Lua 5.3+
+if utf8 then -- Lua 5.3+
    defaults.rocks_provided["utf8"] = cfg.lua_version.."-1"
 end
 
@@ -641,17 +667,23 @@ function cfg.make_paths_from_tree(tree)
    return lua_path, lib_path, bin_path
 end
 
-function cfg.package_paths()
+function cfg.package_paths(current)
    local new_path, new_cpath, new_bin = {}, {}, {}
-   for _,tree in ipairs(cfg.rocks_trees) do
+   local function add_tree_to_paths(tree)
       local lua_path, lib_path, bin_path = cfg.make_paths_from_tree(tree)
       table.insert(new_path, lua_path.."/?.lua")
       table.insert(new_path, lua_path.."/?/init.lua")
       table.insert(new_cpath, lib_path.."/?."..cfg.lib_extension)
       table.insert(new_bin, bin_path)
    end
+   if current then
+      add_tree_to_paths(current)
+   end
+   for _,tree in ipairs(cfg.rocks_trees) do
+      add_tree_to_paths(tree)
+   end
    if extra_luarocks_module_dir then
-     table.insert(new_path, extra_luarocks_module_dir)
+      table.insert(new_path, extra_luarocks_module_dir)
    end
    return table.concat(new_path, ";"), table.concat(new_cpath, ";"), table.concat(new_bin, cfg.export_path_separator)
 end

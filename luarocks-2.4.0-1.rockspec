@@ -1,21 +1,21 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "luarocks"
-version = "2.3.0-1"
+version = "2.4.0-1"
 
 -- LuaDist source
 source = {
-  tag = "2.3.0-1",
+  tag = "2.4.0-1",
   url = "git://github.com/LuaDist-testing/luarocks.git"
 }
 -- Original source
 -- source = {
 --    url = "git://github.com/keplerproject/luarocks",
---    tag = "v2.3.0",
+--    tag = "v2.4.0",
 -- }
 
 description = {
-   summary = "A deployment and management system for Lua modules.",
+   summary = "The package manager for Lua.",
    detailed = [[
       LuaRocks allows you to install Lua modules as self-contained
       packages called "rocks", which also contain version dependency
