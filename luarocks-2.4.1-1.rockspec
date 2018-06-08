@@ -1,19 +1,17 @@
 -- This file was automatically generated for the LuaDist project.
 
 package = "luarocks"
-version = "2.4.0-1"
-
+version = "2.4.1-1"
 -- LuaDist source
 source = {
-  tag = "2.4.0-1",
+  tag = "2.4.1-1",
   url = "git://github.com/LuaDist-testing/luarocks.git"
 }
 -- Original source
 -- source = {
 --    url = "git://github.com/keplerproject/luarocks",
---    tag = "v2.4.0",
+--    tag = "v2.4.1"
 -- }
-
 description = {
    summary = "The package manager for Lua.",
    detailed = [[
@@ -25,23 +23,21 @@ description = {
       required, the correct version is loaded. LuaRocks supports both
       local and remote repositories, and multiple local rocks trees. 
    ]],
-   license = "MIT/X11",
    homepage = "http://www.luarocks.org",
+   license = "MIT/X11",
    maintainer = "Hisham Muhammad"
 }
-
 dependencies = {
    "lua >= 5.1"
 }
-
 build = {
    type = "make",
-   makefile = "Makefile.luarocks",
-   build_pass=false,
+   build_pass = false,
    install_variables = {
-      BINDIR="$(BINDIR)",
-      LUADIR="$(LUADIR)",
-      LUA="$(LUA)",
-      LUAROCKS_PREFIX="$(LUAROCKS_PREFIX)",
-   }
+      BINDIR = "$(BINDIR)",
+      LUA = "$(LUA)",
+      LUADIR = "$(LUADIR)",
+      LUAROCKS_PREFIX = "$(LUAROCKS_PREFIX)"
+   },
+   makefile = "Makefile.luarocks"
 }
