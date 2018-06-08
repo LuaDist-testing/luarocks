@@ -184,7 +184,7 @@ srcdir_luasocket=luasocket-3.0-rc1
 version_cprint=0.1
 verrev_cprint=0.1-2
 
-version_luacov=0.7
+version_luacov=0.8
 verrev_luacov=${version_luacov}-1
 version_lxsh=0.8.6
 version_validate_args=1.5.4
@@ -244,6 +244,7 @@ mkdir -p "$testing_server"
    get "$luarocks_repo/validate-args-1.5.4-1.rockspec"
    get "$luarocks_repo/luasec-0.5-2.rockspec"
    get "$luarocks_repo/luabitop-1.0.2-1.rockspec"
+   get "$luarocks_repo/luabitop-1.0.2-1.src.rock"
    get "$luarocks_repo/lpty-1.0.1-1.src.rock"
    get "$luarocks_repo/cprint-${verrev_cprint}.src.rock"
    get "$luarocks_repo/cprint-${verrev_cprint}.rockspec"
@@ -256,10 +257,11 @@ mkdir -p "$testing_server"
    get "$luarocks_repo/luaposix-33.2.1-1.src.rock"
    get "$luarocks_repo/md5-1.2-1.src.rock"
    get "$luarocks_repo/lmathx-20120430.51-1.src.rock"
-   get "$luarocks_repo/lmathx-20120430.52-1.src.rock"
    get "$luarocks_repo/lmathx-20120430.51-1.rockspec"
+   get "$luarocks_repo/lmathx-20120430.52-1.src.rock"
    get "$luarocks_repo/lmathx-20120430.52-1.rockspec"
-   get "$luarocks_repo/lmathx-20140620-1.rockspec"
+   get "$luarocks_repo/lmathx-20150505-1.src.rock"
+   get "$luarocks_repo/lmathx-20150505-1.rockspec"
    get "$luarocks_repo/lua-path-0.2.3-1.src.rock"
    get "$luarocks_repo/lua-cjson-2.1.0-1.src.rock"
    get "$luarocks_repo/luacov-coveralls-0.1.1-1.src.rock"
@@ -418,6 +420,7 @@ test_lint_ok() { $luarocks download --rockspec validate-args ${verrev_validate_a
 fail_lint_type_mismatch_string() { $luarocks lint "$testing_dir/testfiles/type_mismatch_string-1.0-1.rockspec"; }
 fail_lint_type_mismatch_version() { $luarocks lint "$testing_dir/testfiles/type_mismatch_version-1.0-1.rockspec"; }
 fail_lint_type_mismatch_table() { $luarocks lint "$testing_dir/testfiles/type_mismatch_table-1.0-1.rockspec"; }
+fail_lint_no_build_table() { $luarocks lint "$testing_dir/testfiles/no_build_table-0.1-1.rockspec"; }
 
 test_list() { $luarocks list; }
 test_list_porcelain() { $luarocks list --porcelain; }
@@ -490,11 +493,37 @@ test_deps_mode_make_order_sys() { $luarocks build --tree="$testing_tree" lpeg &&
 
 test_write_rockspec() { $luarocks write_rockspec git://github.com/keplerproject/luarocks; }
 test_write_rockspec_lib() { $luarocks write_rockspec git://github.com/mbalmer/luafcgi --lib=fcgi --license="3-clause BSD" --lua-version=5.1,5.2; }
+test_write_rockspec_format() { $luarocks write_rockspec git://github.com/keplerproject/luarocks --rockspec-format=1.1 --lua-version=5.1,5.2; }
 test_write_rockspec_fullargs() { $luarocks write_rockspec git://github.com/keplerproject/luarocks --lua-version=5.1,5.2 --license="MIT/X11" --homepage="http://www.luarocks.org" --summary="A package manager for Lua modules"; }
 fail_write_rockspec_args() { $luarocks write_rockspec invalid; }
 fail_write_rockspec_args_url() { $luarocks write_rockspec http://example.com/invalid.zip; }
 test_write_rockspec_http() { $luarocks write_rockspec http://luarocks.org/releases/luarocks-2.1.0.tar.gz --lua-version=5.1; }
 test_write_rockspec_basedir() { $luarocks write_rockspec https://github.com/downloads/Olivine-Labs/luassert/luassert-1.2.tar.gz --lua-version=5.1; }
+
+fail_config_noflags() { $luarocks config; }
+test_config_lua_incdir() { $luarocks config --lua-incdir; }
+test_config_lua_libdir() { $luarocks config --lua-libdir; }
+test_config_lua_ver() { $luarocks config --lua-ver; }
+fail_config_system_config() { rm -f "$testing_lrprefix/etc/luarocks/config.lua"; $luarocks config --system-config; }
+test_config_system_config() { mkdir -p "$testing_lrprefix/etc/luarocks"; touch "$testing_lrprefix/etc/luarocks/config.lua"; $luarocks config --system-config; err=$?; rm -f "$testing_lrprefix/etc/luarocks/config.lua"; return $err; }
+fail_config_system_config_invalid() { mkdir -p "$testing_lrprefix/etc/luarocks"; echo "if if if" > "$testing_lrprefix/etc/luarocks/config.lua"; $luarocks config --system-config; err=$?; rm -f "$testing_lrprefix/etc/luarocks/config.lua"; return $err; }
+test_config_user_config() { $luarocks config --user-config; }
+fail_config_user_config() { LUAROCKS_CONFIG="/missing_file.lua" $luarocks config --user-config; }
+test_config_rock_trees() { $luarocks config --rock-trees; }
+test_config_help() { $luarocks help config; }
+
+# Tests for https://github.com/keplerproject/luarocks/issues/375
+test_fetch_base_dir() { $lua <<EOF
+   local fetch = require "luarocks.fetch"
+
+   assert("v0.3" == fetch.url_to_base_dir("https://github.com/hishamhm/lua-compat-5.2/archive/v0.3.zip"))
+   assert("lua-compat-5.2" == fetch.url_to_base_dir("https://github.com/hishamhm/lua-compat-5.2.zip"))
+   assert("lua-compat-5.2" == fetch.url_to_base_dir("https://github.com/hishamhm/lua-compat-5.2.tar.gz"))
+   assert("lua-compat-5.2" == fetch.url_to_base_dir("https://github.com/hishamhm/lua-compat-5.2.tar.bz2"))
+   assert("parser.moon" == fetch.url_to_base_dir("git://github.com/Cirru/parser.moon"))
+   assert("v0.3" == fetch.url_to_base_dir("https://github.com/hishamhm/lua-compat-5.2/archive/v0.3"))
+EOF
+}
 
 test_doc() { $luarocks install luarepl; $luarocks doc luarepl; }
 

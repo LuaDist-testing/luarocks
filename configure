@@ -40,7 +40,7 @@ system's package manager.
                             Default is \$PREFIX
 
 --lua-version=VERSION       Use specific Lua version: 5.1, 5.2, or 5.3
-                            Default is "$LUA_VERSION"
+                            Default is auto-detected.
 --lua-suffix=SUFFIX         Versioning suffix to use in Lua filenames.
                             Default is "$LUA_SUFFIX" (lua$LUA_SUFFIX...)
 --with-lua=PREFIX           Use Lua from given prefix.
@@ -71,25 +71,10 @@ EOF
 # Helper functions
 
 find_program() {
-   path="$PATH"
-   item="`echo "$path" | sed 's/\([^:]*\):.*/\1/'`"
-   path="`echo "$path" | sed -n 's/[^:]*::*\(.*\)/\1/p'`"
-   found="no"
-   while [ -n "$item" ]
-   do
-      if [ -f "$item/$1" ]
-      then
-         found="yes"
-         break
-      fi
-      item="`echo "$path" | sed 's/\([^:]*\):.*/\1/'`"
-      path="`echo "$path" | sed -n 's/[^:]*::*\(.*\)/\1/p'`"
-   done
-   if [ "$found" = "yes" ]
+   prog=`command -v "$1" 2>/dev/null`
+   if [ -n "$prog" ]
    then
-      echo "$item"
-   else
-      echo ""
+      dirname "$prog"
    fi
 }
 
