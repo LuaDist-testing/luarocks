@@ -21,14 +21,31 @@ then
    shift
 fi
 
+luaversion=5.1.5
+
+if [ "$1" == "--lua" ]
+then
+   shift
+   luaversion=$1
+   shift
+fi
+
 testing_dir="$PWD"
 
-testing_tree="$testing_dir/testing"
-testing_sys_tree="$testing_dir/testing_sys"
-testing_tree_copy="$testing_dir/testing_copy"
-testing_sys_tree_copy="$testing_dir/testing_sys_copy"
-testing_cache="$testing_dir/testing_cache"
-testing_server="$testing_dir/testing_server"
+testing_tree="$testing_dir/testing-$luaversion"
+testing_sys_tree="$testing_dir/testing_sys-$luaversion"
+testing_tree_copy="$testing_dir/testing_copy-$luaversion"
+testing_sys_tree_copy="$testing_dir/testing_sys_copy-$luaversion"
+testing_cache="$testing_dir/testing_cache-$luaversion"
+testing_server="$testing_dir/testing_server-$luaversion"
+
+
+if [ "$1" == "--clean" ]
+then
+   shift
+   rm -rf "$testing_cache"
+   rm -rf "$testing_server"
+fi
 
 [ "$1" ] || rm -f luacov.stats.out
 rm -f luacov.report.out
@@ -42,12 +59,6 @@ rm -rf "$testing_dir/testing_config.lua"
 rm -rf "$testing_dir/testing_config_show_downloads.lua"
 rm -rf "$testing_dir/testing_config_sftp.lua"
 rm -rf "$testing_dir/luacov.config"
-
-if [ "$1" == "--clean" ]
-then
-   rm -rf "$testing_cache"
-   rm -rf "$testing_server"
-fi
 
 mkdir -p "$testing_cache"
 
@@ -71,6 +82,18 @@ upload_servers = {
    testing = {
       rsync = "localhost/tmp/luarocks_testing",
    },
+}
+external_deps_dirs = {
+   "/usr/local",
+   "/usr",
+   -- These are used for a test that fails, so it
+   -- can point to invalid paths:
+   {
+      prefix = "/opt",
+      bin = "bin",
+      include = "include",
+      lib = { "lib", "lib64" },
+   }
 }
 EOF
 (
@@ -114,11 +137,11 @@ export LUAROCKS_CONFIG="$testing_dir/testing_config.lua"
 export LUA_PATH=
 export LUA_CPATH=
 
-luaversion=5.2.3
 if [ "$travis" ]
 then
+   luadir=/tmp/lua-$luaversion
    pushd /tmp
-   if [ ! -e "lua/bin/lua" ]
+   if [ ! -e "$luadir/bin/lua" ]
    then
       mkdir -p lua
       echo "Downloading lua $luaversion..."
@@ -126,11 +149,10 @@ then
       tar zxpf "lua-$luaversion.tar.gz"
       cd "lua-$luaversion"
       echo "Building lua $luaversion..."
-      make linux INSTALL_TOP=/tmp/lua &> /dev/null
-      make install INSTALL_TOP=/tmp/lua &> /dev/null
+      make linux INSTALL_TOP="$luadir" &> /dev/null
+      make install INSTALL_TOP="$luadir" &> /dev/null
    fi
    popd
-   luadir=/tmp/lua
 else
    luadir="/Programs/Lua/Current"
 fi
@@ -151,8 +173,8 @@ srcdir_luasocket=luasocket-3.0-rc1
 version_cprint=0.1
 verrev_cprint=0.1-1
 
-version_luacov=0.4
-verrev_luacov=0.4-1
+version_luacov=0.5
+verrev_luacov=0.5-1
 version_lxsh=0.8.6
 version_validate_args=1.5.4
 verrev_validate_args=1.5.4-1
@@ -307,6 +329,8 @@ fail_lint_noarg() { $luarocks lint; }
 fail_search_noarg() { $luarocks search; }
 fail_show_noarg() { $luarocks show; }
 fail_unpack_noarg() { $luarocks unpack; }
+fail_remove_noarg() { $luarocks remove; }
+fail_doc_noarg() { $luarocks doc; }
 fail_new_version_noarg() { $luarocks new_version; }
 fail_write_rockspec_noarg() { $luarocks write_rockspec; }
 
@@ -324,9 +348,10 @@ test_build_withpatch() { need_luasocket; $luarocks build luadoc; }
 test_build_diffversion() { $luarocks build luacov ${version_luacov}; }
 test_build_command() { $luarocks build stdlib; }
 test_build_install_bin() { $luarocks build luarepl; }
-fail_build_nohttps() { need_luasocket; $luarocks download --rockspec validate-args ${verrev_validate_args} && $luarocks build ./validate-args-${version_validate_args}-1.rockspec && rm ./validate-args-${version_validate_args}-1.rockspec; }
-test_build_https() { need_luasocket; $luarocks download --rockspec validate-args ${verrev_validate_args} && echo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx && pwd && ls && $luarocks install $luasec && pwd && ls && $luarocks build ./validate-args-${verrev_validate_args}.rockspec && rm ./validate-args-${verrev_validate_args}.rockspec; }
+test_build_nohttps() { need_luasocket; $luarocks download --rockspec validate-args ${verrev_validate_args} && $luarocks build ./validate-args-${version_validate_args}-1.rockspec && rm ./validate-args-${version_validate_args}-1.rockspec; }
+test_build_https() { need_luasocket; $luarocks download --rockspec validate-args ${verrev_validate_args} && $luarocks install $luasec && $luarocks build ./validate-args-${verrev_validate_args}.rockspec && rm ./validate-args-${verrev_validate_args}.rockspec; }
 test_build_supported_platforms() { $luarocks build lpty; }
+fail_build_missing_external() { $luarocks build "$testing_dir/testfiles/missing_external-0.1-1.rockspec" INEXISTENT_INCDIR="/invalid/dir"; }
 
 test_build_deps_partial_match() { $luarocks build lrandom; }
 test_build_show_downloads() { export LUAROCKS_CONFIG="$testing_dir/testing_config_show_downloads.lua" && $luarocks build alien; export LUAROCKS_CONFIG="$testing_dir/testing_config.lua"; }
@@ -368,7 +393,9 @@ fail_purge_missing_tree() { $luarocks purge --tree="$testing_tree"; }
 test_purge() { $luarocks purge --tree="$testing_sys_tree"; }
 
 test_remove() { $luarocks build luacov ${version_luacov} && $luarocks remove luacov ${version_luacov}; }
-#fail_remove_deps() { $luarocks build luadoc && $luarocks remove luasocket; }
+test_remove_force() { need_luasocket; $luarocks build lualogging && $luarocks remove --force luasocket; }
+fail_remove_deps() { need_luasocket; $luarocks build lualogging && $luarocks remove luasocket; }
+fail_remove_invalid_name() { $luarocks remove invalid.rock; }
 
 test_search_found() { $luarocks search zlib; }
 test_search_missing() { $luarocks search missing_rock; }
@@ -412,6 +439,8 @@ fail_write_rockspec_args() { $luarocks write_rockspec invalid; }
 fail_write_rockspec_args_url() { $luarocks write_rockspec http://example.com/invalid.zip; }
 test_write_rockspec_http() { $luarocks write_rockspec http://luarocks.org/releases/luarocks-2.1.0.tar.gz --lua-version=5.1; }
 test_write_rockspec_basedir() { $luarocks write_rockspec https://github.com/downloads/Olivine-Labs/luassert/luassert-1.2.tar.gz --lua-version=5.1; }
+
+test_doc() { $luarocks install luarepl; $luarocks doc luarepl; }
 
 # Driver #########################################
 

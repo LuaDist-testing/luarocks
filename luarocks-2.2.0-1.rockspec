@@ -1,4 +1,6 @@
-package = "LuaRocks"
+-- This file was automatically generated for the LuaDist project.
+
+package = "luarocks"
 local VER = "2.2.0"
 local REV = "1"
 version = VER.."-"..REV
@@ -23,9 +25,15 @@ dependencies = {
    "lua >= 5.1"
 }
 
+-- LuaDist source
 source = {
-   url = "http://luarocks.org/releases/luarocks-"..VER..".tar.gz",
+  tag = "2.2.0-1",
+  url = "git://github.com/LuaDist-testing/luarocks.git"
 }
+-- Original source
+-- source = {
+--    url = "http://luarocks.org/releases/luarocks-"..VER..".tar.gz",
+-- }
 
 build = {
    type = "make",
