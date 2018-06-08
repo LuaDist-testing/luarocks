@@ -32,6 +32,7 @@ fi
 
 testing_dir="$PWD"
 
+testing_lrprefix="$testing_dir/testing_lrprefix-$luaversion"
 testing_tree="$testing_dir/testing-$luaversion"
 testing_sys_tree="$testing_dir/testing_sys-$luaversion"
 testing_tree_copy="$testing_dir/testing_copy-$luaversion"
@@ -51,6 +52,7 @@ fi
 rm -f luacov.report.out
 rm -rf /tmp/luarocks_testing
 mkdir /tmp/luarocks_testing
+rm -rf "$testing_lrprefix"
 rm -rf "$testing_tree"
 rm -rf "$testing_sys_tree"
 rm -rf "$testing_tree_copy"
@@ -171,10 +173,10 @@ verrev_luasocket=${version_luasocket}-1
 srcdir_luasocket=luasocket-3.0-rc1
 
 version_cprint=0.1
-verrev_cprint=0.1-1
+verrev_cprint=0.1-2
 
-version_luacov=0.5
-verrev_luacov=0.5-1
+version_luacov=0.7
+verrev_luacov=${version_luacov}-1
 version_lxsh=0.8.6
 version_validate_args=1.5.4
 verrev_validate_args=1.5.4-1
@@ -183,7 +185,7 @@ verrev_lxsh=${version_lxsh}-2
 luasec=luasec
 
 cd ..
-./configure --with-lua="$luadir"
+./configure --with-lua="$luadir" --prefix="$testing_lrprefix"
 make clean
 make src/luarocks/site_config.lua
 make dev
@@ -217,8 +219,7 @@ luarocks_admin_nocov="run_lua --nocov luarocks-admin"
 mkdir -p "$testing_server"
 (
    cd "$testing_server"
-   luarocks_repo="http://luarocks.org/repositories/rocks"
-   luarocks_scm_repo="http://luarocks.org/repositories/rocks-scm"
+   luarocks_repo="http://rocks.moonscript.org"
    get() { [ -e `basename "$1"` ] || wget -c "$1"; }
    get "$luarocks_repo/luacov-${verrev_luacov}.src.rock"
    get "$luarocks_repo/luacov-${verrev_luacov}.rockspec"
@@ -226,11 +227,11 @@ mkdir -p "$testing_server"
    get "$luarocks_repo/lualogging-1.3.0-1.src.rock"
    get "$luarocks_repo/luasocket-${verrev_luasocket}.src.rock"
    get "$luarocks_repo/luasocket-${verrev_luasocket}.rockspec"
-   get "$luarocks_repo/luafilesystem-1.6.2-1.src.rock"
-   get "$luarocks_repo/stdlib-35-1.src.rock"
+   get "$luarocks_repo/luafilesystem-1.6.3-1.src.rock"
+   get "$luarocks_repo/stdlib-41.0.0-1.src.rock"
    get "$luarocks_repo/luarepl-0.4-1.src.rock"
    get "$luarocks_repo/validate-args-1.5.4-1.rockspec"
-   get "$luarocks_scm_repo/luasec-scm-1.rockspec"
+   get "$luarocks_repo/luasec-0.5-2.rockspec"
    get "$luarocks_repo/luabitop-1.0.2-1.rockspec"
    get "$luarocks_repo/lpty-1.0.1-1.src.rock"
    get "$luarocks_repo/cprint-${verrev_cprint}.src.rock"
@@ -238,14 +239,16 @@ mkdir -p "$testing_server"
    get "$luarocks_repo/wsapi-1.6-1.src.rock"
    get "$luarocks_repo/lxsh-${verrev_lxsh}.src.rock"
    get "$luarocks_repo/abelhas-1.0-1.rockspec"
-   get "$luarocks_repo/lzlib-0.4.work3-1.src.rock"
+   get "$luarocks_repo/lzlib-0.4.1.53-1.src.rock"
    get "$luarocks_repo/lpeg-0.12-1.src.rock"
-   get "$luarocks_repo/luaposix-31-1.src.rock"
+   get "$luarocks_repo/luaposix-33.2.1-1.src.rock"
    get "$luarocks_repo/md5-1.2-1.src.rock"
-   get "$luarocks_repo/lrandom-20120430.51-1.src.rock"
-   get "$luarocks_repo/lrandom-20120430.52-1.src.rock"
-   get "$luarocks_repo/lrandom-20120430.51-1.rockspec"
-   get "$luarocks_repo/lrandom-20120430.52-1.rockspec"
+   get "$luarocks_repo/lmathx-20120430.51-1.src.rock"
+   get "$luarocks_repo/lmathx-20120430.52-1.src.rock"
+   get "$luarocks_repo/lmathx-20120430.51-1.rockspec"
+   get "$luarocks_repo/lmathx-20120430.52-1.rockspec"
+   get "$luarocks_repo/lmathx-20140620-1.rockspec"
+   get "$luarocks_repo/lmathx-20140620-1.rockspec"
 )
 $luarocks_admin_nocov make_manifest "$testing_server"
 
@@ -322,6 +325,8 @@ fail_unknown_command() { $luarocks unknown_command; }
 
 test_empty_list() { $luarocks list; }
 
+fail_bad_sysconfig() { local err=0; local scdir="$testing_lrprefix/etc/luarocks/"; mkdir -p "$scdir"; local sysconfig="$scdir/config.lua"; echo "aoeui" > "$sysconfig"; echo $sysconfig; $luarocks list; err=$?; rm "$sysconfig"; return "$err"; }
+
 fail_build_noarg() { $luarocks build; }
 fail_download_noarg() { $luarocks download; }
 fail_install_noarg() { $luarocks install; }
@@ -352,18 +357,21 @@ test_build_nohttps() { need_luasocket; $luarocks download --rockspec validate-ar
 test_build_https() { need_luasocket; $luarocks download --rockspec validate-args ${verrev_validate_args} && $luarocks install $luasec && $luarocks build ./validate-args-${verrev_validate_args}.rockspec && rm ./validate-args-${verrev_validate_args}.rockspec; }
 test_build_supported_platforms() { $luarocks build lpty; }
 fail_build_missing_external() { $luarocks build "$testing_dir/testfiles/missing_external-0.1-1.rockspec" INEXISTENT_INCDIR="/invalid/dir"; }
+fail_build_invalidpatch() { need_luasocket; $luarocks build "$testing_dir/testfiles/invalid_patch-0.1-1.rockspec"; }
 
-test_build_deps_partial_match() { $luarocks build lrandom; }
+test_build_deps_partial_match() { $luarocks build lmathx; }
 test_build_show_downloads() { export LUAROCKS_CONFIG="$testing_dir/testing_config_show_downloads.lua" && $luarocks build alien; export LUAROCKS_CONFIG="$testing_dir/testing_config.lua"; }
 
 test_download_all() { $luarocks download --all validate-args && rm validate-args-*; }
 test_download_rockspecversion() { $luarocks download --rockspec validate-args ${verrev_validate_args} && rm validate-args-*; }
 
 test_help() { $luarocks help; }
+fail_help_invalid() { $luarocks help invalid; }
 
 test_install_binaryrock() { $luarocks build --pack-binary-rock cprint && $luarocks install ./cprint-${verrev_cprint}.${platform}.rock && rm ./cprint-${verrev_cprint}.${platform}.rock; }
 test_install_with_bin() { $luarocks install wsapi; }
 fail_install_notazipfile() { $luarocks install "$testing_dir/testfiles/not_a_zipfile-1.0-1.src.rock"; }
+fail_install_invalidpatch() { need_luasocket; $luarocks install "$testing_dir/testfiles/invalid_patch-0.1-1.rockspec"; }
 
 test_lint_ok() { $luarocks download --rockspec validate-args ${verrev_validate_args} && $luarocks lint ./validate-args-${verrev_validate_args}.rockspec && rm ./validate-args-${verrev_validate_args}.rockspec; }
 fail_lint_type_mismatch_string() { $luarocks lint "$testing_dir/testfiles/type_mismatch_string-1.0-1.rockspec"; }
@@ -395,6 +403,7 @@ test_purge() { $luarocks purge --tree="$testing_sys_tree"; }
 test_remove() { $luarocks build luacov ${version_luacov} && $luarocks remove luacov ${version_luacov}; }
 test_remove_force() { need_luasocket; $luarocks build lualogging && $luarocks remove --force luasocket; }
 fail_remove_deps() { need_luasocket; $luarocks build lualogging && $luarocks remove luasocket; }
+fail_remove_missing() { $luarocks remove missing_rock; }
 fail_remove_invalid_name() { $luarocks remove invalid.rock; }
 
 test_search_found() { $luarocks search zlib; }
@@ -409,6 +418,7 @@ test_unpack_download() { rm -rf ./cprint-${verrev_cprint} && $luarocks unpack cp
 test_unpack_src() { rm -rf ./cprint-${verrev_cprint} && $luarocks download --src cprint && $luarocks unpack ./cprint-${verrev_cprint}.src.rock && rm -rf ./cprint-${verrev_cprint}; }
 test_unpack_rockspec() { rm -rf ./cprint-${verrev_cprint} && $luarocks download --rockspec cprint && $luarocks unpack ./cprint-${verrev_cprint}.rockspec && rm -rf ./cprint-${verrev_cprint}; }
 test_unpack_binary() { rm -rf ./cprint-${verrev_cprint} && $luarocks build cprint && $luarocks pack cprint && $luarocks unpack ./cprint-${verrev_cprint}.${platform}.rock && rm -rf ./cprint-${verrev_cprint}; }
+fail_unpack_invalidpatch() { need_luasocket; $luarocks unpack "$testing_dir/testfiles/invalid_patch-0.1-1.rockspec"; }
 
 test_admin_help() { $luarocks_admin help; }
 
@@ -452,8 +462,13 @@ run_tests() {
       echo "-------------------------------------------"
       reset_environment
       if $test
-      then echo "OK: Expected success."
-      else echo "FAIL: Unexpected failure."; exit 1
+      then
+         echo "OK: Expected success."
+      else
+         if [ $? = 99 ]
+         then echo "FAIL: Unexpected crash!"; exit 99
+         fi
+         echo "FAIL: Unexpected failure."; exit 1
       fi
    done
    grep "^fail_$1.*(" < $testing_dir/testing.sh | cut -d'(' -f1 | while read test
@@ -464,7 +479,11 @@ run_tests() {
       reset_environment
       if $test
       then echo "FAIL: Unexpected success."; exit 1
-      else echo "OK: Expected failure."
+      else
+         if [ $? = 99 ]
+         then echo "FAIL: Unexpected crash!"; exit 99
+         fi
+         echo "OK: Expected failure."
       fi
    done
 }
@@ -481,7 +500,11 @@ run_with_full_environment() {
    echo "==========================================="
    echo "Running with full environment"
    echo "==========================================="
-   build_environment luacov luafilesystem luasocket luabitop luaposix md5 lzlib
+   
+   local bitop=
+   [ "$luaversion" = "5.1.5" ] && bitop=luabitop
+   
+   build_environment luacov luafilesystem luasocket $bitop luaposix md5 lzlib
    run_tests $1
 }
 
